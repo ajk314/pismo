@@ -13,6 +13,7 @@ type Repositoryer interface {
 	GetAccountByDocumentNumber(documentNumber string) (models.Account, error)
 	CreateAccount(documentNumber string) (int64, error)
 	CreateTransaction(t models.Transaction) (int64, error)
+	DischargeTransaction(t models.Transaction) error
 }
 
 type Repository struct {
