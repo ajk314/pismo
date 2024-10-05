@@ -34,7 +34,7 @@ func (d Direction) String() string {
 }
 
 // ValidateOperationDirection validates the direction of the transaction
-func ValidateOperationDirection(operationTypeID int, transactionAmount float32) error {
+func ValidateOperationDirection(operationTypeID int, transactionAmount float64) error {
 	direction, ok := operationDirectionMap[operationTypeID]
 	if !ok {
 		return fmt.Errorf("invalid operation type ID: %d", operationTypeID)

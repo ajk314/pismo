@@ -12,7 +12,7 @@ func TestValidateOperationDirection(t *testing.T) {
 	tests := []struct {
 		name              string
 		operationTypeID   int
-		transactionAmount float32
+		transactionAmount float64
 		expectedError     string
 	}{
 		{

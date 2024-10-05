@@ -1,80 +1,93 @@
 package store
 
 import (
-	"pismo/models"
+	"fmt"
 
-    "fmt"
-    "slices"
+	"pismo/models"
 )
 
 func (repo *Repository) CreateTransaction(t models.Transaction) (int64, error) {
-    query := "INSERT INTO Transactions (account_id, operation_type_id, amount, balance) VALUES (?, ?, ?, ?)"
-    row, err := repo.DB.Exec(query, t.AccountID, t.OperationTypeID, t.Amount, t.Balance)
-    if err != nil {
-        return 0, err
-    }
-    return row.LastInsertId()
+	query := "INSERT INTO Transactions (account_id, operation_type_id, amount, balance) VALUES (?, ?, ?, ?)"
+	row, err := repo.DB.Exec(query, t.AccountID, t.OperationTypeID, t.Amount, t.Balance)
+	if err != nil {
+		return 0, err
+	}
+	return row.LastInsertId()
 }
 
 func (repo *Repository) DischargeTransaction(depositTransaction models.Transaction) error {
-    query := `SELECT * 
-        from Transactions
+	tx, err := repo.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+    defer func() {
+        if err != nil {
+            tx.Rollback()
+        }
+    }()
+
+	query := `SELECT transaction_id, balance FROM Transactions
         WHERE account_id = ?
         AND operation_type_id < 4
         AND balance < 0
-    `
-    rows, err := repo.DB.Query(query, depositTransaction.AccountID)
-    if err != nil {
-        return err
-    }
+        ORDER BY event_date ASC`
 
-    transactions := []models.Transaction{}
-    for rows.Next() {
-        trans := models.Transaction{}
-        err = rows.Scan(&trans.ID, &trans.AccountID, &trans.OperationTypeID, &trans.Amount, &trans.Balance, &trans.EventDate)
-        if err != nil {
-            return err
-        }
-        transactions = append(transactions, trans)
-    }
+	rows, err := tx.Query(query, depositTransaction.AccountID)
+	if err != nil {
+		return fmt.Errorf("failed to query transactions: %w", err)
+	}
+	defer rows.Close()
 
-    updatedTransactionIDs := []int64{}
-    remainingDeposit := depositTransaction.Balance
-    for i, t := range transactions {
-        if remainingDeposit == 0 {
-            break
-        }
+	remainingDeposit := depositTransaction.Amount
 
-        absCurrentBalance := t.Balance * -1
+    var updatedTransactions []models.Transaction
+	for rows.Next() {
+        var trans models.Transaction
+		if err := rows.Scan(&trans.ID, &trans.Balance); err != nil {
+			return fmt.Errorf("failed to scan row: %w", err)
+		}
+
+        absCurrentBalance := trans.Balance * -1
         if remainingDeposit > absCurrentBalance { // using absolute value for comparison to simplify logic here
             remainingDeposit -= absCurrentBalance
-            transactions[i].Balance = 0
+            trans.Balance = 0
         } else {
             // there is more debt than remaining deposit, so pay off what we can and break out
-            transactions[i].Balance += remainingDeposit // balance is negative, so "lower" the balance by adding the remaining deposit
+            trans.Balance += remainingDeposit // balance is negative, so "lower" the balance by adding the remaining deposit
             remainingDeposit = 0
         }
-        updatedTransactionIDs = append(updatedTransactionIDs, t.ID)
-    }
 
-    updateBalanceQuery := "UPDATE Transactions SET balance = ? WHERE transaction_id = ?"
-    // update only transactions that had a chance in balance
-    for _, t := range transactions {
-        if slices.Contains(updatedTransactionIDs, t.ID) {
-            row, err := repo.DB.Exec(updateBalanceQuery, t.Balance, t.ID)
-            if err != nil {
-                return err
-            }
-            fmt.Println(row.LastInsertId())
-        }
-    }
+		updatedTransactions = append(updatedTransactions, trans)
 
-    // update the deposit transaction with remaining balance
-    row, err := repo.DB.Exec(updateBalanceQuery, remainingDeposit, depositTransaction.ID)
-    if err != nil {
-        return err
-    }
-    fmt.Println(row.LastInsertId())
+		if remainingDeposit <= 0 {
+			break
+		}
+	}
 
-    return nil
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error during row iteration: %w", err)
+	}
+
+    // not a redundant close since we do that in a defer
+	// rows must be closed before performing updates
+	rows.Close()
+
+	// update balances for debt transactions
+	updateBalanceQuery := "UPDATE Transactions SET balance = ? WHERE transaction_id = ?"
+	for _, update := range updatedTransactions {
+		if _, err := tx.Exec(updateBalanceQuery, update.Balance, update.ID); err != nil {
+			return fmt.Errorf("failed to update balance for transaction %d: %w", update.ID, err)
+		}
+	}
+
+	// update remaining balance for the deposit transaction
+	if _, err := tx.Exec(updateBalanceQuery, remainingDeposit, depositTransaction.ID); err != nil {
+		return fmt.Errorf("failed to update deposit transaction: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
