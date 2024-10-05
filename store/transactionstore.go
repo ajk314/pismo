@@ -4,6 +4,7 @@ import (
 	"pismo/models"
 
     "fmt"
+    "slices"
 )
 
 func (repo *Repository) CreateTransaction(t models.Transaction) (int64, error) {
@@ -16,11 +17,11 @@ func (repo *Repository) CreateTransaction(t models.Transaction) (int64, error) {
 }
 
 func (repo *Repository) DischargeTransaction(depositTransaction models.Transaction) error {
-    query := `SELECT balance 
+    query := `SELECT * 
         from Transactions
         WHERE account_id = ?
         AND operation_type_id < 4
-        AND balance > 0
+        AND balance < 0
     `
     rows, err := repo.DB.Query(query, depositTransaction.AccountID)
     if err != nil {
@@ -37,31 +38,39 @@ func (repo *Repository) DischargeTransaction(depositTransaction models.Transacti
         transactions = append(transactions, trans)
     }
 
+    updatedTransactionIDs := []int64{}
     remainingDeposit := depositTransaction.Balance
-    for _, t := range transactions {
-        currentBalance := t.Balance
-        if remainingDeposit > currentBalance {
-            remainingDeposit -= t.Balance
-            t.Balance = 0
-        } else {
-            t.Balance -= remainingDeposit
-            remainingDeposit = 0
+    for i, t := range transactions {
+        if remainingDeposit == 0 {
             break
         }
-    }
 
-    for _, t := range transactions {
-        query := "UPDATE Transactions SET balance = ? WHERE transaction_id = ?"
-        row, err := repo.DB.Exec(query, t.Balance, t.ID)
-        if err != nil {
-            return err
+        absCurrentBalance := t.Balance * -1
+        if remainingDeposit > absCurrentBalance { // using absolute value for comparison to simplify logic here
+            remainingDeposit -= absCurrentBalance
+            transactions[i].Balance = 0
+        } else {
+            // there is more debt than remaining deposit, so pay off what we can and break out
+            transactions[i].Balance += remainingDeposit // balance is negative, so "lower" the balance by adding the remaining deposit
+            remainingDeposit = 0
         }
-        fmt.Println(row.LastInsertId())
+        updatedTransactionIDs = append(updatedTransactionIDs, t.ID)
     }
 
-    depositQuery := "INSERT INTO Transactions (account_id, operation_type_id, amount, balance) VALUES (?, ?, ?, ?)"
-    depositTransaction.Balance = remainingDeposit
-    row, err := repo.DB.Exec(depositQuery, depositTransaction.AccountID, depositTransaction.OperationTypeID, depositTransaction.Amount, depositTransaction.Balance)
+    updateBalanceQuery := "UPDATE Transactions SET balance = ? WHERE transaction_id = ?"
+    // update only transactions that had a chance in balance
+    for _, t := range transactions {
+        if slices.Contains(updatedTransactionIDs, t.ID) {
+            row, err := repo.DB.Exec(updateBalanceQuery, t.Balance, t.ID)
+            if err != nil {
+                return err
+            }
+            fmt.Println(row.LastInsertId())
+        }
+    }
+
+    // update the deposit transaction with remaining balance
+    row, err := repo.DB.Exec(updateBalanceQuery, remainingDeposit, depositTransaction.ID)
     if err != nil {
         return err
     }

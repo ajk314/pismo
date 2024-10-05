@@ -25,16 +25,16 @@ func (s *TransactionService) CreateTransaction(transaction models.Transaction) (
 	}
 
 	if transaction.OperationTypeID < 4 {
-		transaction.Balance = transaction.Amount
-	} else {
 		transaction.Balance = -transaction.Amount
+	} else {
+		transaction.Balance = transaction.Amount
 	}
 	
 	transactionID, err := s.db.CreateTransaction(transaction)
 	if err != nil {
 		return 0, err
 	}
-
+	transaction.ID = transactionID
 	
 	err = s.db.DischargeTransaction(transaction)
 	if err != nil {

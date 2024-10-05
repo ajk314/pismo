@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS Transactions (
     account_id INT,
     operation_type_id INT,
     amount DECIMAL(10, 2),
-    balance Decimal(10, 2) DEFAULT 0.0,
+    balance DECIMAL(10, 2) DEFAULT 0.0,
     event_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (account_id) REFERENCES Accounts(account_id),
     FOREIGN KEY (operation_type_id) REFERENCES OperationTypes(operation_type_id)
@@ -31,7 +31,7 @@ VALUES
 
 INSERT INTO Transactions (transaction_id, account_id, operation_type_id, amount, balance, event_date)
 VALUES 
-(1, 1, 1, -50.0, -50.0, '2020-01-01 10:32:07.719922'),
-(2, 1, 1, -23.5, -23.5, '2020-01-01 10:48:12.2135875'),
-(3, 1, 1, -18.7, -18.7, '2020-01-02 19:01:23.1458543');
+(1, 1, 1, -50.00, -50.00, '2020-01-01 10:32:07.719922'),
+(2, 1, 1, -25.00, -25.00, '2020-01-01 10:48:12.2135875'),
+(3, 1, 1, -15.00, -15.00, '2020-01-02 19:01:23.1458543');
 -- (4, 1, 4, 60.0, '2020-01-05 09:34:18.5893223');
