@@ -9,6 +9,11 @@ import (
 	"pismo/models"
 )
 
+type Tx interface {
+    Commit() error
+    Rollback() error
+}
+
 type Repositoryer interface {
 	GetAccountByID(id int) (models.Account, error)
 	GetAccountByDocumentNumber(documentNumber string) (models.Account, error)

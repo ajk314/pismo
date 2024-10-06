@@ -25,9 +25,9 @@ func (s *TransactionService) CreateTransaction(transaction models.Transaction) (
 	if err != nil {
 		return 0, err
 	}
-	
-	// this is the db transaction that will be used to commit to db, and rollback everything
-	// in case of any failures
+
+	// this is the db transaction struct that will be used to commit to db, and
+	// rollback everything in case of any failures
 	tx, err := s.db.BeginTransaction()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
@@ -48,10 +48,10 @@ func (s *TransactionService) CreateTransaction(transaction models.Transaction) (
 		return 0, err
 	}
 	transaction.ID = transactionID
-	
+
 	// discharge the transaction only if its a deposit
 	if transaction.OperationTypeID == 4 {
-		// use the same db transaction context (not monetary transaction) so we can 
+		// use the same db transaction context (not monetary transaction) so we can
 		// commit or rollback all at once
 		err = s.db.ProcessDischargeTransactionWithTx(tx, transaction)
 		if err != nil {

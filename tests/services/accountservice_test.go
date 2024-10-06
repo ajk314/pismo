@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"pismo/mocks"
 	"pismo/models"
 	"pismo/services"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetAccountByID(t *testing.T) {
