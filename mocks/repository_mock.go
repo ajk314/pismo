@@ -1,9 +1,11 @@
 package mocks
 
 import (
-	"pismo/models"
+	"database/sql"
 
 	"github.com/stretchr/testify/mock"
+
+	"pismo/models"
 )
 
 type MockRepository struct {
@@ -25,7 +27,17 @@ func (m *MockRepository) CreateAccount(documentNumber string) (int64, error) {
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockRepository) CreateTransaction(t models.Transaction) (int64, error) {
-	args := m.Called(t)
+func (m *MockRepository) BeginTransaction() (*sql.Tx, error) {
+	args := m.Called()
+	return args.Get(0).(*sql.Tx), args.Error(1)
+}
+
+func (m *MockRepository) CreateTransactionWithTx(tx *sql.Tx, transaction models.Transaction) (int64, error) {
+	args := m.Called(transaction)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockRepository) ProcessDischargeTransactionWithTx(*sql.Tx, models.Transaction) error {
+	args := m.Called()
+	return args.Error(1)
 }
