@@ -23,12 +23,7 @@ func (repo *Repository) CreateTransactionWithTx(tx *sql.Tx, t models.Transaction
 }
 
 func (repo *Repository) ProcessDischargeTransactionWithTx(tx *sql.Tx, depositTransaction models.Transaction) error {
-	query := `SELECT transaction_id, balance FROM Transactions
-        WHERE account_id = ?
-        AND operation_type_id < 4
-        AND balance < 0
-        ORDER BY event_date ASC
-    `
+	query := `SELECT transaction_id, balance FROM Transactions WHERE account_id = ? AND operation_type_id < 4 AND balance < 0 ORDER BY event_date ASC`
 
 	rows, err := tx.Query(query, depositTransaction.AccountID)
 	if err != nil {
