@@ -34,6 +34,7 @@ func main() {
 	r.HandleFunc("/accounts/{id}", accountHandler.HandleGetAccount).Methods("GET")
 	r.HandleFunc("/accounts", accountHandler.HandleCreateAccount).Methods("POST")
 	r.HandleFunc("/transactions", transactionHandler.HandleCreateTransaction).Methods("POST")
+	r.HandleFunc("/transactions-race-condition", transactionHandler.HandleCreateTransactionRaceCondition).Methods("POST")
 
 	fmt.Println("Server is running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", r))

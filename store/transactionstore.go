@@ -23,7 +23,10 @@ func (repo *Repository) CreateTransactionWithTx(tx *sql.Tx, t models.Transaction
 }
 
 func (repo *Repository) ProcessDischargeTransactionWithTx(tx *sql.Tx, depositTransaction models.Transaction) error {
-	query := `SELECT transaction_id, balance FROM Transactions WHERE account_id = ? AND operation_type_id < 4 AND balance < 0 ORDER BY event_date ASC`
+	// `FOR UPDATE` locks all rows that are selected until transaction is complete
+	query := `SELECT transaction_id, balance FROM Transactions WHERE account_id = ? AND operation_type_id < 4 AND balance < 0 ORDER BY event_date ASC FOR UPDATE`
+	// TEST: if you want to see race conditions, use this query below without the `FOR UPDATE`
+	// query := `SELECT transaction_id, balance FROM Transactions WHERE account_id = ? AND operation_type_id < 4 AND balance < 0 ORDER BY event_date ASC`
 
 	rows, err := tx.Query(query, depositTransaction.AccountID)
 	if err != nil {

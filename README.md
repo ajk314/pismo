@@ -193,3 +193,32 @@ Transactions
 |              4 |          1 |                 4 |  60.00 | 2020-01-05 09:34:19 |
 +----------------+------------+-------------------+--------+---------------------+
 ```
+
+## Testing race conditions
+The `http://localhost:8080/transactions-race-condition` endpoint is a test endpoint for testing race conditions and deadlocks. It will essentially create a transaction similar to the `/transactions` endpoint, except it will call it multiple times concurrently (currently hard coded to 10). So if you make a deposit of 3, then it will make 10 of those transactions, making a total deposit of 30.  
+
+I recommend using MySQL Workbench (or some other MySQL GUI) for simplicity of running commands. Here's some sample commands I wrote for testing.
+```sql
+DELETE FROM pismo_db.Transactions where amount > 0 AND operation_type_id = 4;
+DELETE FROM pismo_db.Transactions where transaction_id > 3;
+
+UPDATE pismo_db.Transactions SET amount = -100, balance = -100.0 where transaction_id = 1;
+UPDATE pismo_db.Transactions SET amount = -50, balance = -50.0 where transaction_id = 2;
+UPDATE pismo_db.Transactions SET amount = -50, balance = -50.0 where transaction_id = 3;
+```
+This will delete all new transactions you made, and reset the current ones to have balance values to be nice even values. Then you can run the following curl command to run the concurrent transactions.  
+```bash
+curl --location 'http://localhost:8080/transactions-race-condition' \
+--header 'Content-Type: application/json' \
+--data '{
+    "account_id": 1,
+    "operation_type_id": 4,
+    "amount": 3,
+    "event_date": "2024-09-17T15:04:05Z"
+}'
+```
+Now you can check the new state of the Transactions table with this query.
+```sql
+SELECT * FROM pismo_db.Transactions;
+```
+Now you can see if the proper number of transactions were created, and if the balance was appropriately calculated. If you followed this example completely, the balance of transaction_id 1 is now `-70.00`, and 10 new transaction rows were created with an amount of `3.00` and a balance of `0.00`.
